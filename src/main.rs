@@ -67,23 +67,22 @@ fn main() {
     }));
 
     for (i, handle) in threads.into_iter().enumerate() {
-    match handle.join() {
-        Err(_) => error!(
-            thread_id = i, 
-            service = "LoggerService", 
-            error = "Thread failed to join", 
-            "System thread encountered an error."
-        ),
-        Ok(_) => {}
+        match handle.join() {
+            Err(_) => error!(
+                thread_id = i,
+                service = "LoggerService",
+                error = "Thread failed to join",
+                "System thread encountered an error."
+            ),
+            Ok(_) => {}
+        }
     }
-}
 
-error!(
-    service = "LoggerService",
-    reason = "Unexpected shutdown",
-    "System shutting down unexpectedly"
-);
-
+    error!(
+        service = "LoggerService",
+        reason = "Unexpected shutdown",
+        "System shutting down unexpectedly"
+    );
 }
 
 // Role Enum
