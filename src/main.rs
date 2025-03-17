@@ -5,9 +5,10 @@ use tracing_subscriber::fmt::format::FmtSpan;
 fn main() {
     // Initialize Logger with JSON output
     tracing_subscriber::fmt()
-        .pretty()
+        .json()
         .with_span_events(FmtSpan::CLOSE)
         // .with_current_span(false)
+        .without_time()
         .init();
 
     let user_id = "123e4567-e89b-12d3-a456-426614174000";

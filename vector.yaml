@@ -1,0 +1,40 @@
+data_dir: /var/lib/vector
+
+# Define log sources
+sources:
+  docker_logs:
+    type: docker_logs
+    include_containers: ["rust-log-collector"]
+    exclude_containers: ["vector_log-collector", "clickhouse_server"]
+    
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      . = object!(.message)
+
+
+sinks:
+  console_sink:
+    type: console
+    inputs: ["parse_json"]
+    encoding:
+      codec: "json"
+
+  clickhouse_sink:
+    type: clickhouse
+    inputs: ["parse_json"] # Connects to the transform step
+    endpoint: http://localhost:8123 # ClickHouse URL
+    database: logs # ClickHouse database
+    table: system_logs # Table to store logs
+    compression: "gzip"
+    skip_unknown_fields: true
+    auth:
+      strategy: basic
+      user: "admin"
+      password: "admin123"
+    
+
+
