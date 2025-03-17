@@ -13,7 +13,20 @@ transforms:
     inputs:
       - docker_logs
     source: |
-      . = object!(.message)
+      value, err = parse_json(.message)
+      if err == null {
+        . = value
+        .action = to_string!(value.fields.action)
+        .entity = to_string!(value.fields.entity)
+        .timestamp = to_string!(.timestamp)
+        .level = to_string!(.level)
+        .source = to_string!(.source)
+        .user_id = to_string!(value.fields.user_id)
+
+        del(.fields)
+      } else {
+        abort
+      }
 
 
 sinks:
@@ -23,18 +36,19 @@ sinks:
     encoding:
       codec: "json"
 
-  clickhouse_sink:
-    type: clickhouse
-    inputs: ["parse_json"] # Connects to the transform step
-    endpoint: http://localhost:8123 # ClickHouse URL
-    database: logs # ClickHouse database
-    table: system_logs # Table to store logs
-    compression: "gzip"
-    skip_unknown_fields: true
-    auth:
-      strategy: basic
-      user: "admin"
-      password: "admin123"
+  # clickhouse_sink:
+  #   type: clickhouse
+  #   inputs: ["parse_json"] # Connects to the transform step
+  #   endpoint: http://localhost:8123 # ClickHouse URL
+  #   database: logs # ClickHouse database
+  #   table: system_logs # Table to store logs
+  #   compression: "gzip"
+  #   skip_unknown_fields: true
+  #   format: json_each_row
+  #   auth:
+  #     strategy: basic
+  #     user: "admin"
+  #     password: "admin123"
     
 
 

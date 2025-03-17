@@ -8,7 +8,6 @@ fn main() {
         .json()
         .with_span_events(FmtSpan::CLOSE)
         // .with_current_span(false)
-        .without_time()
         .init();
 
     let user_id = "123e4567-e89b-12d3-a456-426614174000";
@@ -19,7 +18,7 @@ fn main() {
     threads.push(thread::spawn({
         let user_id = user_id;
         move || {
-            let interval = time::Duration::from_secs(5);
+            let interval = time::Duration::from_secs(50);
             loop {
                 info!(
                     user_id = user_id,
@@ -36,7 +35,7 @@ fn main() {
     threads.push(thread::spawn({
         let user_id = user_id;
         move || {
-            let interval = time::Duration::from_secs(6);
+            let interval = time::Duration::from_secs(50);
             loop {
                 warn!(
                     user_id = user_id,
@@ -53,7 +52,7 @@ fn main() {
     threads.push(thread::spawn({
         let user_id = user_id;
         move || {
-            let interval = time::Duration::from_secs(7);
+            let interval = time::Duration::from_secs(50);
             loop {
                 error!(
                     user_id = user_id,
