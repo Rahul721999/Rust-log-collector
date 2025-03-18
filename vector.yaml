@@ -36,19 +36,19 @@ sinks:
     encoding:
       codec: "json"
 
-  # clickhouse_sink:
-  #   type: clickhouse
-  #   inputs: ["parse_json"] # Connects to the transform step
-  #   endpoint: http://localhost:8123 # ClickHouse URL
-  #   database: logs # ClickHouse database
-  #   table: system_logs # Table to store logs
-  #   compression: "gzip"
-  #   skip_unknown_fields: true
-  #   format: json_each_row
-  #   auth:
-  #     strategy: basic
-  #     user: "admin"
-  #     password: "admin123"
+  clickhouse_sink:
+    type: clickhouse
+    inputs: ["parse_json"] # Connects to the transform step
+    endpoint: http://clickhouse_server:8123 # ClickHouse URL
+    database: logs # ClickHouse database
+    table: system_logs # Table to store logs
+    compression: "gzip"
+    skip_unknown_fields: true
+    format: json_each_row
+    auth:
+      strategy: basic
+      user: "admin"
+      password: "admin123"
     
 
 
