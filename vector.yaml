@@ -1,54 +1,118 @@
-data_dir: /var/lib/vector
-
-# Define log sources
+# /* -------------------------Local settings-------------------------  */
+data_dir: /var/lib/vector/
 sources:
-  docker_logs:
-    type: docker_logs
-    include_containers: ["rust-log-collector"]
-    exclude_containers: ["vector_log-collector", "clickhouse_server"]
-    
+  # file_source:
+  #   type: file
+  #   include:
+  #     - ./logs/*.log
+  #   read_from: beginning
+  #   checkpoint.enabled: false
+  file_source:
+    type: stdin
+# <-------------------process the logs------------------->
 transforms:
   parse_json:
     type: remap
-    inputs:
-      - docker_logs
+    inputs: ["file_source"]
     source: |
-      value, err = parse_json(.message)
-      if err == null {
-        . = value
-        .action = to_string!(value.fields.action)
-        .entity = to_string!(value.fields.entity)
-        .timestamp = to_string!(.timestamp)
-        .level = to_string!(.level)
-        .source = to_string!(.source)
-        .user_id = to_string!(value.fields.user_id)
 
-        del(.fields)
-      } else {
+      # Validate outer message
+      if !exists(.message) || !is_string(.message) || .message == "" {
+        log("Skipping log without valid message", level: "warn")
         abort
       }
+      parsed, err = parse_json(.message)
+      if err != null {
+        log("Failed to parse outer JSON: " + err, level: "warn")
+        abort
+      }
+
+      . = parsed
+      # Require scope
+      if !exists(.scope) || !is_string(.scope) || .scope == "" {
+        log("Skipping log without valid scope", level: "warn")
+        abort
+      }
+
+      # Check if .fields.message exists and is a string that can be parsed as JSON
+      if !exists(.fields) || !exists(.fields.message) || !is_string(.fields.message) || .fields.message == "" {
+        log("Skipping log without valid fields.message", level: "warn")
+        abort
+      }
+
+      # Attempt to parse the nested JSON in .fields.message
+      nested_message, err = parse_json(.fields.message)
+      if err != null {
+        log("Skipping log with unparseable nested JSON: " + err, level: "warn")
+        abort
+      }
+
+      # Check if the nested message has a timestamp
+      if !exists(nested_message.timestamp) || is_null(nested_message.timestamp) {
+        log("Skipping log without timestamp in nested JSON", level: "warn")
+        abort
+      }
+
+      # Check if the nested message has a log_level
+      if !exists(nested_message.log_level) || is_null(nested_message.log_level) {
+        log("Skipping log without log_level in nested JSON", level: "warn")
+        abort
+      }
+
+      # Check if the nested message has a log_type
+      if !exists(nested_message.log_type) || is_null(nested_message.log_type) {
+        log("Skipping log without log_type in nested JSON", level: "warn")
+        abort
+      }
+
+      # Check if the nested message has an action field
+      if !exists(nested_message.action) || is_null(nested_message.action) {
+        log("Skipping log without action in nested JSON", level: "warn")
+        abort
+      }
+
+      # Check if the nested message has a log_id
+      if !exists(nested_message.log_id) || is_null(nested_message.log_id) {
+        log("Skipping log without log_id in nested JSON", level: "warn")
+        abort
+      }
+
+      # If we reach here, the log is a valid one, so process it
+      .structured_message = nested_message
+      .timestamp = .structured_message.timestamp
+      .log_id = .structured_message.log_id
+      .log_level = .structured_message.log_level
+      .log_type = .structured_message.log_type
+      .module = .structured_message.module
+      .user_id = .structured_message.user_id
+      .user_name = .structured_message.user_name
+      .event_id = .structured_message.event_id
+      .log_msg = .structured_message.log_msg
+      .action = .structured_message.action
+      .metadata = encode_json(.structured_message.metadata)
+
+      # Clean up fields
+      del(.fields)
+      del(.message)
+      del(.structured_message)
+      del(.source_type)
 
 
 sinks:
   console_sink:
     type: console
-    inputs: ["parse_json"]
+    inputs: ["file_source"]
     encoding:
       codec: "json"
 
-  clickhouse_sink:
+  my_clickhouse_sink:
     type: clickhouse
     inputs: ["parse_json"] # Connects to the transform step
-    endpoint: http://clickhouse_server:8123 # ClickHouse URL
+    endpoint: "http://localhost:8123" # ClickHouse URL
     database: logs # ClickHouse database
-    table: system_logs # Table to store logs
-    compression: "gzip"
-    skip_unknown_fields: true
-    format: json_each_row
+    table: system_logs # Table to store log
+    format: "json_each_row"
     auth:
       strategy: basic
       user: "admin"
       password: "admin123"
-    
-
-

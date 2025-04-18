@@ -1,0 +1,13 @@
+sources:
+  file_logs:
+    type: file
+    include:
+      - ./logs/*.log
+
+sinks:
+  console:
+    type: console
+    inputs:
+      - file_logs
+    encoding:
+      codec: text
