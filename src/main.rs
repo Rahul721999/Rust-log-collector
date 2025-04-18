@@ -5,7 +5,7 @@ mod settings;
 
 use builder::{LogAction, LogBuilder};
 use generator::generate_event_id;
-use logs::{log_error, log_info, log_warn};
+use logs::{log_audit, log_error, log_info, log_warn};
 use settings::init_logger;
 use std::{thread, time};
 use tracing::{info, instrument};
@@ -28,7 +28,7 @@ async fn main() {
                     &event_id,
                     "LoggerService",
                     &format!("Thread {} failed to join", i),
-                ));
+                ).add_metadata("user_id", "12343121"));
             }
             Ok(_) => {}
         }
@@ -39,6 +39,12 @@ async fn main() {
         &event_id,
         "LoggerService",
         "Unexpected shutdown",
+    ));
+
+    log_audit(LogBuilder::system(
+        &event_id,
+        "LoggerService",
+        "Audit log entry",
     ));
 }
 
@@ -135,3 +141,4 @@ fn spawn_transaction_failure_thread() -> thread::JoinHandle<()> {
         }
     })
 }
+
