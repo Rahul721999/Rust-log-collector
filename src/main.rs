@@ -1,116 +1,137 @@
+mod builder;
+mod generator;
+mod logs;
+mod settings;
+
+use builder::{LogAction, LogBuilder};
+use generator::generate_event_id;
+use logs::{log_error, log_info, log_warn};
+use settings::init_logger;
 use std::{thread, time};
-use tracing::{error, info, warn};
-use tracing_subscriber::fmt::format::FmtSpan;
+use tracing::{info, instrument};
 
-fn main() {
-    // Initialize Logger with JSON output
-    tracing_subscriber::fmt()
-        .json()
-        .with_span_events(FmtSpan::CLOSE)
-        // .with_current_span(false)
-        .init();
+#[tokio::main]
+async fn main() {
+    init_logger("Rust-log-collector").await.unwrap();
 
-    let user_id = "123e4567-e89b-12d3-a456-426614174000";
-
-    let mut threads = Vec::new();
-
-    // Thread 1: Logs user profile updates every 5 seconds
-    threads.push(thread::spawn({
-        let user_id = user_id;
-        move || {
-            let interval = time::Duration::from_secs(50);
-            loop {
-                info!(
-                    user_id = user_id,
-                    action = "Updated Profile",
-                    entity = %EntityType::UserProfileUpdate,
-                    "User updated profile details"
-                );
-                thread::sleep(interval);
-            }
-        }
-    }));
-
-    // Thread 2: Logs security warnings every 6 seconds
-    threads.push(thread::spawn({
-        let user_id = user_id;
-        move || {
-            let interval = time::Duration::from_secs(50);
-            loop {
-                warn!(
-                    user_id = user_id,
-                    action = "Security Warning",
-                    entity = %EntityType::Authentication,
-                    "Multiple failed login attempts"
-                );
-                thread::sleep(interval);
-            }
-        }
-    }));
-
-    // Thread 3: Logs transaction failures every 7 seconds
-    threads.push(thread::spawn({
-        let user_id = user_id;
-        move || {
-            let interval = time::Duration::from_secs(50);
-            loop {
-                error!(
-                    user_id = user_id,
-                    action = "Transaction Failed",
-                    entity = %EntityType::Transaction,
-                    reason = "Insufficient funds",
-                    "Transaction failed"
-                );
-                thread::sleep(interval);
-            }
-        }
-    }));
+    let threads = vec![
+        spawn_profile_update_thread(),
+        spawn_security_warning_thread(),
+        spawn_transaction_failure_thread(),
+    ];
 
     for (i, handle) in threads.into_iter().enumerate() {
         match handle.join() {
-            Err(_) => error!(
-                thread_id = i,
-                service = "LoggerService",
-                error = "Thread failed to join",
-                "System thread encountered an error."
-            ),
+            Err(_) => {
+                let event_id = generate_event_id();
+                log_error(LogBuilder::system(
+                    &event_id,
+                    "LoggerService",
+                    &format!("Thread {} failed to join", i),
+                ));
+            }
             Ok(_) => {}
         }
     }
 
-    error!(
-        service = "LoggerService",
-        reason = "Unexpected shutdown",
-        "System shutting down unexpectedly"
-    );
+    let event_id = generate_event_id();
+    log_error(LogBuilder::system(
+        &event_id,
+        "LoggerService",
+        "Unexpected shutdown",
+    ));
 }
 
-// Role Enum
-#[derive(Debug, Clone, Copy)]
-pub enum Role {
-    Admin,
-    User,
-    Customer,
-}
+use serde::{Deserialize, Serialize};
 
-// EntityType Enum
-#[derive(Debug, Clone, Copy)]
-pub enum EntityType {
-    Authentication,
-    Transaction,
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) enum Action {
     UserProfileUpdate,
+    SecurityWarning,
+    TransactionFailed,
 }
 
-// Implement Display trait for Role
-impl std::fmt::Display for Role {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+impl LogAction for Action {}
+
+impl ToString for Action {
+    fn to_string(&self) -> String {
+        match self {
+            Action::UserProfileUpdate => "UserProfileUpdate".to_string(),
+            Action::SecurityWarning => "SecurityWarning".to_string(),
+            Action::TransactionFailed => "TransactionFailed".to_string(),
+        }
     }
 }
 
-// Implement Display trait for EntityType
-impl std::fmt::Display for EntityType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
+#[instrument(fields(event_id, user_id, module, user_name))]
+fn spawn_profile_update_thread() -> thread::JoinHandle<()> {
+    let user_id = "user123";
+    let event_id = generate_event_id();
+    let module = "UserProfileModule";
+    let user_name = "john_doe";
+
+    thread::spawn(move || {
+        let interval = time::Duration::from_secs(10);
+        loop {
+            log_info(LogBuilder::user(
+                &event_id,
+                module,
+                user_id,
+                user_name,
+                "User updated profile details",
+                Action::UserProfileUpdate,
+            ));
+            nested_fn();
+            thread::sleep(interval);
+        }
+    })
+}
+
+#[instrument]
+fn nested_fn() {
+    info!("Loggin from nested fn")
+}
+
+fn spawn_security_warning_thread() -> thread::JoinHandle<()> {
+    let user_id = "user456";
+    let event_id = generate_event_id();
+    let module = "SecurityModule";
+    let user_name = "jane_doe";
+
+    thread::spawn(move || {
+        let interval = time::Duration::from_secs(10);
+        loop {
+            log_warn(LogBuilder::user(
+                &event_id,
+                module,
+                user_id,
+                user_name,
+                "Multiple failed login attempts",
+                Action::SecurityWarning,
+            ));
+            thread::sleep(interval);
+        }
+    })
+}
+
+fn spawn_transaction_failure_thread() -> thread::JoinHandle<()> {
+    let user_id = "user789";
+    let event_id = generate_event_id();
+    let module = "TransactionModule";
+    let user_name = "alice_smith";
+
+    thread::spawn(move || {
+        let interval = time::Duration::from_secs(10);
+        loop {
+            log_error(LogBuilder::user(
+                &event_id,
+                module,
+                user_id,
+                user_name,
+                "Transaction failed: Insufficient funds",
+                Action::TransactionFailed,
+            ));
+            thread::sleep(interval);
+        }
+    })
 }

@@ -1,6 +1,8 @@
 services:
   rust-log-collector:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: rust-log-collector
     ports:
       - "8080:8080"
@@ -9,6 +11,8 @@ services:
       - vector
     logging:
       driver: "json-file"
+    volumes:
+      - ./logs:/app/logs
 
   vector:
     image: timberio/vector:0.45.0-alpine

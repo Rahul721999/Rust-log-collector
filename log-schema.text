@@ -1,0 +1,44 @@
+{
+    "LogLevel": {
+        "type": "String",
+        "enum": ["DEBUG","INFO","AUDIT","WARN","ERROR"]
+    },
+    "LogType" : {
+        "type": "String",
+        "enum": ["User", "System"]
+    }
+    "Scope": {
+        "type": "String",
+        "enum": ["OMS","CA","PE"]
+    },
+    "Module": {
+        "type": "String",
+        "enum": [
+            "NewCaptal",
+            "AdditionalCapital",
+            "WithdrawCapital",
+            "etc..."
+        ]
+    },
+    "user_id": "String",
+    "name": "String",
+    "Actions": {
+        "type": "String",
+        "enum": [
+            "Created",
+            "Rejected",
+            "Approved",
+            "Edited", 
+            "UserProfileCreated", 
+            "UserProfileUpdated",
+            "etc..."
+        ]
+    },
+    "Metadata": {
+        "StrategyCode": "string",
+        "ClientCode": "string",
+        "ClientStrategyCode": "string",
+        "Details": "Optional<string>",
+        "TxnId": "Optional<string>"
+    }
+}
